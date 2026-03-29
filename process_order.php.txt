@@ -1,0 +1,34 @@
+<?php
+require 'db.php';
+
+// Primamo podatke sa frontenda (JSON)
+$data = json_decode(file_get_contents('php://input'), true);
+
+if ($data) {
+    try {
+        $pdo->beginTransaction();
+
+        // 1. Ubacujemo narudžbu u tabelu 'orders'
+        $stmt = $pdo->prepare("INSERT INTO orders (customer_email, total_price, payment_status) VALUES (?, ?, ?)");
+        $stmt->execute([$data['email'], $data['total'], 'paid']);
+        $orderId = $pdo->lastInsertId();
+
+        // 2. Ubacujemo svaku stavku iz korpe u 'order_items'
+        foreach ($data['items'] as $item) {
+            $stmt = $pdo->prepare("INSERT INTO order_items (order_id, product_id, quantity, price_at_purchase) VALUES (?, ?, ?, ?)");
+            $stmt->execute([$orderId, $item['id'], $item['quantity'], $item['price']]);
+
+            // 3. Smanjujemo zalihe (Stock Management)
+            $updateStock = $pdo->prepare("UPDATE products SET stock_quantity = stock_quantity - ? WHERE id = ?");
+            $updateStock->execute([$item['quantity'], $item['id']]);
+        }
+
+        $pdo->commit();
+        echo json_encode(['status' => 'success', 'message' => 'Order placed successfully!']);
+
+    } catch (Exception $e) {
+        $pdo->rollBack();
+        echo json_encode(['status' => 'error', 'message' => $e->getMessage()]);
+    }
+}
+?>

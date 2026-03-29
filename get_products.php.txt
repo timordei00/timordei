@@ -1,0 +1,11 @@
+<?php
+require 'db.php';
+
+// Vučemo sve proizvode iz baze
+$stmt = $pdo->query("SELECT * FROM products");
+$products = $stmt->fetchAll();
+
+// Šaljemo podatke frontendu u JSON formatu
+header('Content-Type: application/json');
+echo json_encode($products);
+?>
